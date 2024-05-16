@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vertical Timeline</title>
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+
+  .timeline {
+    position: relative;
+    padding: 80px;
+  }
+
+  .timeline:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3.9%;
+    width: 2px;
+    background-color: #333;
+  }
+
+  .event {
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 40px;
+  }
+
+  .event::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -10px;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    background-color: #333;
+    border-radius: 80%;
+  }
+
+  .event .date {
+    position: absolute;
+    top: -10px; /* Adjust the top position */
+    left: -60px;
+    transform-origin: left top;
+    font-size: 10px; /* Adjust the font size */
+    white-space: nowrap; /* Prevent wrapping */
+  }
+
+  .event .content {
+    background-color: #f4f4f4;
+    padding: 10px;
+    border-radius: 5px;
+  }
+
+  .dataset {
+    position: absolute;
+    top: -20px;
+    left: 30px;
+    width: 120px;
+    text-align: center;
+    font-size: 10px;
+    color: white;
+    padding: 5px;
+    border-radius: 5px;
+    z-index: 1; /* Ensure the flag is displayed over the box */
+   }
+
+  .tags {
+    position: absolute;
+    top: -20px;
+    left: 160px;
+    font-size: 10px;
+    color: white;
+    white-space: nowrap; /* Prevent wrapping */
+  }
+
+  .tag-box {
+    display: inline-block;
+    margin-right: 5px; /* Adjust the space between tags */
+    padding: 5px 5px 5px 5px;
+    border-radius: 5px;
+  }
+
+  .flag {
+    position: absolute;
+    top: 5px; /* Adjust the vertical position */
+    left: 140px; /* Adjust the horizontal position */
+    width: 20px; /* Adjust the size of the flag */
+    z-index: 3; /* Ensure the flag is displayed over the box */
+  }
+
+</style>
+</head>
+<body>
+
+<div id="counters" style="font-size: 18px; margin-bottom: 10px;"></div>
+
+<div>
+  <label for="startDate">Start Date:</label>
+  <input type="date" id="startDate">
+  <label for="endDate">End Date:</label>
+  <input type="date" id="endDate">
+  <button onclick="filterEvents()">Filter</button>
+</div>
+
+<div class="timeline" id="timeline">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+<script>
+
+  let totalEvents = 0;
+  let failedEvents = 0;
+
+  function updateCounters() {
+    const counters = document.getElementById('counters');
+    counters.textContent = `Total events visualized: ${totalEvents} | Events not rendered: ${failedEvents}`;
+  }
+
+  console.log('Fetching and processing CSV file...');
+
+  // Define CSV file and its corresponding colors
+  const csvFile = 'final_dataset.csv';
+  const colorMap = {
+    'Tow Center News': '#1035C8',
+    'Letra Chica Twitter': '#1035C8',
+    'Letra Chica YouTube': '#1035C8',
+    'Letra Chica Meta': '#1035C8',
+    'Twitter Policy Blog': '#1035C8',
+    'Google Policy Blog': '#1035C8',
+    'Meta Policy Blog': '#1035C8',
+    'other': '#D14B3D',
+    'children': '#FFC107', // Assign colors for each tag
+    'gender_violence': '#FF5722',
+    'hate_speech': '#E91E63',
+    'health_disinfo': '#4CAF50',
+    'political_disinfo': '#2196F3',
+    'safety': '#9C27B0'
+  };
+
+  // Function to check if a string is a valid URL
+  function isValidURL(string) {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  fetch(csvFile)
+    .then(response => response.text())
+    .then(data => {
+      console.log('CSV file fetched successfully.');
+
+      const parsedData = Papa.parse(data, { header: true }).data;
+
+      console.log('CSV data parsed successfully.');
+
+      const validEvents = parsedData.filter(row => row.Date !== 'NA' && row.Event !== 'NA' && typeof row.Event === 'string' && row.Event.trim() !== '');
+  
+
+      console.log('Filtering out rows with invalid dates or events...');
+
+      // Sort events chronologically
+      validEvents.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+
+      validEvents.forEach(event => {
+        totalEvents++; // Increment total events counter
+
+        const eventDiv = document.createElement('div');
+        eventDiv.classList.add('event');
+        
+        const dateDiv = document.createElement('div');
+        dateDiv.classList.add('date');
+        dateDiv.textContent = new Date(event.Date).toDateString(); // Display date as a string
+        eventDiv.appendChild(dateDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.classList.add('content');
+
+        // Check if there is a valid URL
+        if (event.link && isValidURL(event.link)) {
+          const link = document.createElement('a');
+          link.href = event.link;
+          link.textContent = event.Event;
+          contentDiv.appendChild(link);
+        } else {
+          contentDiv.textContent = event.Event;
+        }
+        
+        eventDiv.appendChild(contentDiv);
+
+        const actionReactionDiv = document.createElement('div');
+        actionReactionDiv.classList.add('dataset');
+        actionReactionDiv.textContent = event.dataset;
+        actionReactionDiv.style.backgroundColor = colorMap[event.dataset] || colorMap['other']; // Apply color based on dataset
+        eventDiv.appendChild(actionReactionDiv);
+
+        const tagsDiv = document.createElement('div');
+        tagsDiv.classList.add('tags');
+        if (event.categories) {
+          // Handle categories with single quotes
+          const categories = event.categories.replace(/'/g, "\""); // Replace single quotes with double quotes
+          try {
+            const parsedCategories = JSON.parse(categories);
+            parsedCategories.forEach(tag => {
+              const tagBox = document.createElement('div');
+              tagBox.classList.add('tag-box');
+              tagBox.textContent = tag;
+              tagBox.style.backgroundColor = colorMap[tag] || '#999'; // Assign color based on tag
+              tagsDiv.appendChild(tagBox);
+            });
+          } catch (error) {
+            console.error('Error parsing categories:', error);
+          }
+        }
+        eventDiv.appendChild(tagsDiv);
+        
+        timeline.appendChild(eventDiv);
+      });
+
+      console.log('Events visualized on the timeline.');
+      updateCounters(); // Update counters after events are appended
+    })
+    .catch(error => {
+      console.error('Error fetching or parsing CSV file:', error);
+      failedEvents++; // Increment failed events counter
+      updateCounters(); // Update counters after an error occurs
+    })
+    .finally(() => {
+      console.log(`Total events processed: ${totalEvents}`);
+      console.log(`Failed to render: ${failedEvents}`);
+    });
+
+let allEvents = []; // Store all events for filtering
+
+fetch(csvFile)
+  .then(response => response.text())
+  .then(data => {
+    console.log('CSV file fetched successfully.');
+
+    const parsedData = Papa.parse(data, { header: true }).data;
+
+    console.log('CSV data parsed successfully.');
+
+    allEvents = parsedData.filter(row => row.Date !== 'NA' && row.Event !== 'NA' && typeof row.Event === 'string' && row.Event.trim() !== '');
+
+    console.log('Filtering out rows with invalid dates or events...');
+
+    // Sort events chronologically
+    allEvents.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+
+    // Initially display all events
+    displayEvents(allEvents);
+
+    console.log('Events visualized on the timeline.');
+    updateCounters(); // Update counters after events are appended
+  })
+  .catch(error => {
+    console.error('Error fetching or parsing CSV file:', error);
+    failedEvents++; // Increment failed events counter
+    updateCounters(); // Update counters after an error occurs
+  })
+  .finally(() => {
+    console.log(`Total events processed: ${totalEvents}`);
+    console.log(`Failed to render: ${failedEvents}`);
+  });
+
+function displayEvents(events) {
+  const timeline = document.getElementById('timeline');
+  timeline.innerHTML = ''; // Clear existing events
+
+  events.forEach(event => {
+    totalEvents++; // Increment total events counter
+
+    const eventDiv = document.createElement('div');
+    eventDiv.classList.add('event');
+    
+    const dateDiv = document.createElement('div');
+    dateDiv.classList.add('date');
+    dateDiv.textContent = new Date(event.Date).toDateString(); // Display date as a string
+    eventDiv.appendChild(dateDiv);
+
+    const contentDiv = document.createElement('div');
+    contentDiv.classList.add('content');
+
+    // Check if there is a valid URL
+    if (event.link && isValidURL(event.link)) {
+      const link = document.createElement('a');
+      link.href = event.link;
+      link.textContent = event.Event;
+      contentDiv.appendChild(link);
+    } else {
+      contentDiv.textContent = event.Event;
+    }
+    
+    eventDiv.appendChild(contentDiv);
+
+    const actionReactionDiv = document.createElement('div');
+    actionReactionDiv.classList.add('dataset');
+    actionReactionDiv.textContent = event.dataset;
+    actionReactionDiv.style.backgroundColor = colorMap[event.dataset] || colorMap['other']; // Apply color based on dataset
+    eventDiv.appendChild(actionReactionDiv);
+
+    const tagsDiv = document.createElement('div');
+    tagsDiv.classList.add('tags');
+    if (event.categories) {
+      // Handle categories with single quotes
+      const categories = event.categories.replace(/'/g, "\""); // Replace single quotes with double quotes
+      try {
+        const parsedCategories = JSON.parse(categories);
+        parsedCategories.forEach(tag => {
+          const tagBox = document.createElement('div');
+          tagBox.classList.add('tag-box');
+          tagBox.textContent = tag;
+          tagBox.style.backgroundColor = colorMap[tag] || '#999'; // Assign color based on tag
+          tagsDiv.appendChild(tagBox);
+        });
+      } catch (error) {
+        console.error('Error parsing categories:', error);
+      }
+    }
+    eventDiv.appendChild(tagsDiv);
+    
+    timeline.appendChild(eventDiv);
+  });
+}
+
+function filterEvents() {
+  const startDate = new Date(document.getElementById('startDate').value);
+  const endDate = new Date(document.getElementById('endDate').value);
+
+  if (isNaN(startDate) || isNaN(endDate)) {
+    alert('Please select valid start and end dates.');
+    return;
+  }
+
+  const filteredEvents = allEvents.filter(event => {
+    const eventDate = new Date(event.Date);
+    return eventDate >= startDate && eventDate <= endDate;
+  });
+
+  totalEvents = 0; // Reset total events counter
+  displayEvents(filteredEvents);
+  updateCounters();
+}
+
+
+</script>
+
+</body>
+</html>
